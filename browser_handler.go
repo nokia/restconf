@@ -187,8 +187,8 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 					return
 				}
 				if !outputSel.IsNil() && a.Output() != nil {
-					setContentType(compliance, w.Header())
-					if err = sendActionOutput(compliance, w, outputSel, a); err != nil {
+					setContentType(Strict, w.Header())
+					if err = sendActionOutput(Strict, w, outputSel, a); err != nil {
 						handleErr(compliance, err, r, w)
 						return
 					}
