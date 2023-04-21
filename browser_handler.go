@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strings"
 
 	"context"
 
@@ -29,6 +30,7 @@ type ProxyContextKey string
 var RemoteIpAddressKey = ProxyContextKey("FC_REMOTE_IP")
 
 const YangDataJsonMimeType = "application/yang-data+json"
+const XmlDataJsonMimeType = "application/yang-data+json"
 
 const TextStreamMimeType = "text/event-stream"
 
@@ -149,7 +151,7 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 				return
 			} else {
 				// CRUD - Read
-				setContentType(compliance, w.Header())
+				setContentType(r.Header.Get("Accept"), compliance, w.Header())
 				err = sel.InsertInto(jsonWtr(compliance, w)).LastErr
 			}
 		case "PATCH":
@@ -187,8 +189,8 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 					return
 				}
 				if !outputSel.IsNil() && a.Output() != nil {
-					setContentType(Strict, w.Header())
-					if err = sendActionOutput(Strict, w, outputSel, a); err != nil {
+					setContentType(r.Header.Get("Accept"), compliance, w.Header())
+					if err = sendActionOutput(compliance, w.Header().Get("Content-Type"), w, outputSel, a); err != nil {
 						handleErr(compliance, err, r, w)
 						return
 					}
@@ -214,21 +216,41 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 	}
 }
 
-func setContentType(compliance ComplianceOptions, h http.Header) {
-	if compliance.QualifyNamespaceDisabled {
-		h.Set("Content-Type", mime.TypeByExtension(".json"))
-	} else {
-		h.Set("Content-Type", YangDataJsonMimeType)
+func setContentType(request_accept string, compliance ComplianceOptions, h http.Header) {
+
+	if request_accept == "" || request_accept == YangDataJsonMimeType {
+		if compliance.QualifyNamespaceDisabled {
+			h.Set("Content-Type", mime.TypeByExtension(".json"))
+		} else {
+			h.Set("Content-Type", YangDataJsonMimeType)
+		}
+	} else if request_accept == XmlDataJsonMimeType {
+		if compliance.QualifyNamespaceDisabled {
+			h.Set("Content-Type", mime.TypeByExtension(".xml"))
+		} else {
+			h.Set("Content-Type", XmlDataJsonMimeType)
+		}
 	}
 }
 
-func sendActionOutput(compliance ComplianceOptions, out io.Writer, output node.Selection, a *meta.Rpc) error {
+func sendActionOutput(compliance ComplianceOptions, content_type string, out io.Writer, output node.Selection, a *meta.Rpc) error {
 	if !compliance.DisableActionWrapper {
 		// IETF formated output
 		// https://datatracker.ietf.org/doc/html/rfc8040#section-3.6.2
 		mod := meta.OriginalModule(a).Ident()
-		if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
-			return err
+		if strings.Contains(content_type, "json") == true {
+			if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
+				return err
+			}
+		} else if strings.Contains(content_type, "json") == true {
+			if _, err := fmt.Fprintf(out, `<"output xmlns=%s>`, mod); err != nil {
+				return err
+			}
+		} else {
+			//TODO: Not sure about this. Should not happen
+			if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
+				return err
+			}
 		}
 	}
 	err := output.InsertInto(jsonWtr(compliance, out)).LastErr
