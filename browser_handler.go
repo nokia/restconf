@@ -242,7 +242,7 @@ func sendActionOutput(compliance ComplianceOptions, content_type string, out io.
 			if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
 				return err
 			}
-		} else if strings.Contains(content_type, "json") == true {
+		} else if strings.Contains(content_type, "xml") == true {
 			if _, err := fmt.Fprintf(out, `<"output xmlns=%s>`, mod); err != nil {
 				return err
 			}
@@ -256,8 +256,19 @@ func sendActionOutput(compliance ComplianceOptions, content_type string, out io.
 	err := output.InsertInto(jsonWtr(compliance, out)).LastErr
 
 	if !compliance.DisableActionWrapper {
-		if _, err := fmt.Fprintf(out, "}"); err != nil {
-			return err
+		if strings.Contains(content_type, "json") == true {
+			if _, err := fmt.Fprintf(out, "}"); err != nil {
+				return err
+			}
+		} else if strings.Contains(content_type, "xml") == true {
+			if _, err := fmt.Fprintf(out, `<"/output>`); err != nil {
+				return err
+			}
+		} else {
+			//TODO: Not sure about this. Should not happen
+			if _, err := fmt.Fprintf(out, "}"); err != nil {
+				return err
+			}
 		}
 	}
 	return err
