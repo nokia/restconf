@@ -3,6 +3,7 @@ package restconf
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"mime"
@@ -182,7 +183,7 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 				a := sel.Meta().(*meta.Rpc)
 				var input node.Node
 				if a.Input() != nil {
-					if input, err = readInput(compliance, r, a); err != nil {
+					if input, err = readInput(compliance, r.Header.Get("Content-Type"), r, a); err != nil {
 						handleErr(compliance, err, r, w)
 						return
 					}
@@ -282,7 +283,7 @@ func xmlWtr(compliance ComplianceOptions, out io.Writer) node.Node {
 	return wtr.Node()
 }
 
-func readInput(compliance ComplianceOptions, r *http.Request, a *meta.Rpc) (node.Node, error) {
+func readInput(compliance ComplianceOptions, content_type string, r *http.Request, a *meta.Rpc) (node.Node, error) {
 	// not part of spec, custom feature to allow for form uploads
 	if isMultiPartForm(r.Header) {
 		return formNode(r)
@@ -293,17 +294,38 @@ func readInput(compliance ComplianceOptions, r *http.Request, a *meta.Rpc) (node
 	// IETF formated input
 	// https://datatracker.ietf.org/doc/html/rfc8040#section-3.6.1
 	var vals map[string]interface{}
-	d := json.NewDecoder(r.Body)
-	err := d.Decode(&vals)
-	if err != nil {
-		return nil, err
+	if content_type == YangDataJsonMimeType1 || content_type == YangDataJsonMimeType2 {
+		d := json.NewDecoder(r.Body)
+		err := d.Decode(&vals)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	if content_type == YangDataXmlMimeType1 || content_type == YangDataXmlMimeType2 {
+		d := xml.NewDecoder(r.Body)
+		err := d.Decode(&vals)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	key := meta.OriginalModule(a).Ident() + ":input"
 	payload, found := vals[key].(map[string]interface{})
 	if !found {
 		return nil, fmt.Errorf("'%s' missing in input wrapper", key)
 	}
-	return nodeutil.ReadJSONValues(payload), nil
+
+	//var node node.Node
+	if content_type == YangDataJsonMimeType1 || content_type == YangDataJsonMimeType2 {
+		return nodeutil.ReadJSONValues(payload), nil
+	}
+
+	if content_type == YangDataXmlMimeType1 || content_type == YangDataXmlMimeType2 {
+		return nodeutil.ReadXMLValues(payload), nil
+	}
+
+	return nil, nil
 }
 
 func requestNode(r *http.Request) (node.Node, error) {
