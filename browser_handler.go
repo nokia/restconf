@@ -29,8 +29,12 @@ type ProxyContextKey string
 
 var RemoteIpAddressKey = ProxyContextKey("FC_REMOTE_IP")
 
-const YangDataJsonMimeType = "application/yang-data+json"
-const XmlDataJsonMimeType = "application/yang-data+json"
+// TODO: Clarify this: RFC8572 uses application/yang.data+xml and RFC8040 uses application/yang-data+json
+const YangDataJsonMimeType1 = "application/yang-data+json"
+const YangDataJsonMimeType2 = "application/yang.data+json"
+
+const YangDataXmlMimeType1 = "application/yang-data+xml"
+const YangDataXmlMimeType2 = "application/yang.data+xml"
 
 const TextStreamMimeType = "text/event-stream"
 
@@ -218,54 +222,42 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 
 func setContentType(request_accept string, compliance ComplianceOptions, h http.Header) {
 
-	if request_accept == "" || request_accept == YangDataJsonMimeType {
+	if request_accept == "" || request_accept == YangDataJsonMimeType1 || request_accept == YangDataJsonMimeType2 {
 		if compliance.QualifyNamespaceDisabled {
 			h.Set("Content-Type", mime.TypeByExtension(".json"))
 		} else {
-			h.Set("Content-Type", YangDataJsonMimeType)
+			h.Set("Content-Type", YangDataJsonMimeType1)
 		}
-	} else if request_accept == XmlDataJsonMimeType {
+	} else if request_accept == YangDataXmlMimeType1 || request_accept == YangDataXmlMimeType2 {
 		if compliance.QualifyNamespaceDisabled {
 			h.Set("Content-Type", mime.TypeByExtension(".xml"))
 		} else {
-			h.Set("Content-Type", XmlDataJsonMimeType)
+			h.Set("Content-Type", YangDataXmlMimeType1)
 		}
 	}
 }
 
 func sendActionOutput(compliance ComplianceOptions, content_type string, out io.Writer, output node.Selection, a *meta.Rpc) error {
+
+	var node node.Node
+
 	if !compliance.DisableActionWrapper {
 		// IETF formated output
 		// https://datatracker.ietf.org/doc/html/rfc8040#section-3.6.2
 		mod := meta.OriginalModule(a).Ident()
-		if strings.Contains(content_type, "json") == true {
+		if strings.Contains(content_type, "xml") == false {
 			if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
 				return err
 			}
-		} else if strings.Contains(content_type, "xml") == true {
-			if _, err := fmt.Fprintf(out, `<"output xmlns=%s>`, mod); err != nil {
-				return err
-			}
+			node = jsonWtr(compliance, out)
 		} else {
-			//TODO: Not sure about this. Should not happen
-			if _, err := fmt.Fprintf(out, `{"%s:output":`, mod); err != nil {
-				return err
-			}
+			node = xmlWtr(compliance, out)
 		}
 	}
-	err := output.InsertInto(jsonWtr(compliance, out)).LastErr
+	err := output.InsertInto(node).LastErr
 
 	if !compliance.DisableActionWrapper {
-		if strings.Contains(content_type, "json") == true {
-			if _, err := fmt.Fprintf(out, "}"); err != nil {
-				return err
-			}
-		} else if strings.Contains(content_type, "xml") == true {
-			if _, err := fmt.Fprintf(out, `<"/output>`); err != nil {
-				return err
-			}
-		} else {
-			//TODO: Not sure about this. Should not happen
+		if strings.Contains(content_type, "xml") == false {
 			if _, err := fmt.Fprintf(out, "}"); err != nil {
 				return err
 			}
@@ -276,6 +268,14 @@ func sendActionOutput(compliance ComplianceOptions, content_type string, out io.
 
 func jsonWtr(compliance ComplianceOptions, out io.Writer) node.Node {
 	wtr := &nodeutil.JSONWtr{
+		Out:              out,
+		QualifyNamespace: !compliance.QualifyNamespaceDisabled,
+	}
+	return wtr.Node()
+}
+
+func xmlWtr(compliance ComplianceOptions, out io.Writer) node.Node {
+	wtr := &nodeutil.XMLWtr{
 		Out:              out,
 		QualifyNamespace: !compliance.QualifyNamespaceDisabled,
 	}
