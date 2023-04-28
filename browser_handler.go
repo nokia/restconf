@@ -3,15 +3,17 @@ package restconf
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"mime"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"context"
 
+	"github.com/clbanning/mxj/v2"
 	"github.com/freeconf/yang/fc"
 	"github.com/freeconf/yang/meta"
 	"github.com/freeconf/yang/node"
@@ -294,24 +296,38 @@ func readInput(compliance ComplianceOptions, content_type string, r *http.Reques
 	// IETF formated input
 	// https://datatracker.ietf.org/doc/html/rfc8040#section-3.6.1
 	var vals map[string]interface{}
+	var payload map[string]interface{}
+	var key string
+	found := false
+
 	if content_type == YangDataJsonMimeType1 || content_type == YangDataJsonMimeType2 {
 		d := json.NewDecoder(r.Body)
 		err := d.Decode(&vals)
 		if err != nil {
 			return nil, err
 		}
+		key = meta.OriginalModule(a).Ident() + ":input"
+		//payload, found = vals[key].(map[string]interface{})
 	}
 
 	if content_type == YangDataXmlMimeType1 || content_type == YangDataXmlMimeType2 {
-		d := xml.NewDecoder(r.Body)
-		err := d.Decode(&vals)
+		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
+		m, err := mxj.NewMapXml(body)
+		if err != nil {
+			return nil, err
+		}
+		key, err = m.Root()
+		if err != nil {
+			return nil, err
+		}
+		removeAttributesFromXmlMap(vals)
+		vals = m
 	}
 
-	key := meta.OriginalModule(a).Ident() + ":input"
-	payload, found := vals[key].(map[string]interface{})
+	payload, found = vals[key].(map[string]interface{})
 	if !found {
 		return nil, fmt.Errorf("'%s' missing in input wrapper", key)
 	}
@@ -335,4 +351,19 @@ func requestNode(r *http.Request) (node.Node, error) {
 	}
 
 	return nodeutil.ReadJSONIO(r.Body), nil
+}
+
+func removeAttributesFromXmlMap(m map[string]interface{}) {
+	val := reflect.ValueOf(m)
+	for _, e := range val.MapKeys() {
+		v := val.MapIndex(e)
+		if strings.Contains(e.String(), "-") == true {
+			delete(m, e.String())
+			continue
+		}
+		switch t := v.Interface().(type) {
+		case map[string]interface{}:
+			removeAttributesFromXmlMap(t)
+		}
+	}
 }
