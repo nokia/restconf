@@ -323,7 +323,7 @@ func readInput(compliance ComplianceOptions, content_type string, r *http.Reques
 		if err != nil {
 			return nil, err
 		}
-		removeAttributesFromXmlMap(vals)
+		removeAttributesFromXmlMap(m)
 		vals = m
 	}
 
