@@ -225,7 +225,7 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 
 func setContentType(request_accept string, compliance ComplianceOptions, h http.Header) {
 
-	if request_accept == "" || request_accept == YangDataJsonMimeType1 || request_accept == YangDataJsonMimeType2 {
+	if request_accept == YangDataJsonMimeType1 || request_accept == YangDataJsonMimeType2 {
 		if compliance.QualifyNamespaceDisabled {
 			h.Set("Content-Type", mime.TypeByExtension(".json"))
 		} else {
@@ -236,6 +236,12 @@ func setContentType(request_accept string, compliance ComplianceOptions, h http.
 			h.Set("Content-Type", mime.TypeByExtension(".xml"))
 		} else {
 			h.Set("Content-Type", YangDataXmlMimeType1)
+		}
+	} else {
+		if compliance.QualifyNamespaceDisabled {
+			h.Set("Content-Type", mime.TypeByExtension(".json"))
+		} else {
+			h.Set("Content-Type", YangDataJsonMimeType1)
 		}
 	}
 }
