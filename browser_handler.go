@@ -279,8 +279,7 @@ func jsonWtr(compliance ComplianceOptions, out io.Writer) node.Node {
 
 func xmlWtr(compliance ComplianceOptions, out io.Writer) node.Node {
 	wtr := &nodeutil.XMLWtr{
-		Out:              out,
-		QualifyNamespace: !compliance.QualifyNamespaceDisabled,
+		Out: out,
 	}
 	return wtr.Node()
 }
@@ -332,16 +331,7 @@ func readInput(compliance ComplianceOptions, content_type string, r *http.Reques
 		return nil, fmt.Errorf("'%s' missing in input wrapper", key)
 	}
 
-	//var node node.Node
-	if content_type == YangDataJsonMimeType1 || content_type == YangDataJsonMimeType2 {
-		return nodeutil.ReadJSONValues(payload), nil
-	}
-
-	if content_type == YangDataXmlMimeType1 || content_type == YangDataXmlMimeType2 {
-		return nodeutil.ReadXMLValues(payload), nil
-	}
-
-	return nil, nil
+	return nodeutil.ReadJSONValues(payload), nil
 }
 
 func requestNode(r *http.Request) (node.Node, error) {
