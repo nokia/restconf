@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net/http"
 	"reflect"
 	"strings"
@@ -158,7 +157,7 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 				return
 			} else {
 				// CRUD - Read
-				setContentType(r.Header.Get("Accept"), compliance, w.Header())
+				setResponseContentType(r.Header.Get("Accept"), compliance, w)
 				err = sel.InsertInto(jsonWtr(compliance, w)).LastErr
 			}
 		case "PATCH":
@@ -196,7 +195,7 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 					return
 				}
 				if !outputSel.IsNil() && a.Output() != nil {
-					setContentType(r.Header.Get("Accept"), compliance, w.Header())
+					setResponseContentType(r.Header.Get("Accept"), compliance, w)
 					if err = sendActionOutput(compliance, w.Header().Get("Content-Type"), w, outputSel, a); err != nil {
 						handleErr(compliance, err, r, w)
 						return
@@ -220,29 +219,6 @@ func (hndlr *browserHandler) ServeHTTP(compliance ComplianceOptions, ctx context
 
 	if err != nil {
 		handleErr(compliance, err, r, w)
-	}
-}
-
-func setContentType(request_accept string, compliance ComplianceOptions, h http.Header) {
-
-	if request_accept == YangDataJsonMimeType1 || request_accept == YangDataJsonMimeType2 {
-		if compliance.QualifyNamespaceDisabled {
-			h.Set("Content-Type", mime.TypeByExtension(".json"))
-		} else {
-			h.Set("Content-Type", YangDataJsonMimeType1)
-		}
-	} else if request_accept == YangDataXmlMimeType1 || request_accept == YangDataXmlMimeType2 {
-		if compliance.QualifyNamespaceDisabled {
-			h.Set("Content-Type", mime.TypeByExtension(".xml"))
-		} else {
-			h.Set("Content-Type", YangDataXmlMimeType1)
-		}
-	} else {
-		if compliance.QualifyNamespaceDisabled {
-			h.Set("Content-Type", mime.TypeByExtension(".json"))
-		} else {
-			h.Set("Content-Type", YangDataJsonMimeType1)
-		}
 	}
 }
 
