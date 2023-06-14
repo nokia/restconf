@@ -29,8 +29,9 @@ type Error struct {
 }
 
 type Errors struct {
-	Xmlns  string   `xml:"xmlns,attr"`
-	Errors [1]Error `xml:"error"`
+	XMLName xml.Name `xml:"errors"`
+	Xmlns   string   `xml:"xmlns,attr"`
+	Errors  [1]Error `xml:"error"`
 }
 
 // SplitAddress takes a complete address and breaks it into pieces according
@@ -130,7 +131,9 @@ func handleErr(compliance ComplianceOptions, err error, r *http.Request, w http.
 		msg = buff.String()
 		setResponseContentType(r.Header.Get("Accept"), compliance, w)
 	}
-	http.Error(w, msg, code)
+	w.WriteHeader(code)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	fmt.Fprintln(w, msg)
 	return true
 }
 
