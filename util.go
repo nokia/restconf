@@ -299,10 +299,6 @@ func setResponseContentType(request_accept string, compliance ComplianceOptions,
 			w.Header().Set("Content-Type", YangDataXmlMimeType1)
 		}
 	} else {
-		if compliance.QualifyNamespaceDisabled {
-			w.Header().Set("Content-Type", mime.TypeByExtension(".json"))
-		} else {
-			w.Header().Set("Content-Type", YangDataJsonMimeType1)
-		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 }
