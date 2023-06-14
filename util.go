@@ -29,7 +29,8 @@ type Error struct {
 }
 
 type Errors struct {
-	Errors [1]Error `xml:"errors"`
+	Xmlns  string   `xml:"xmlns,attr"`
+	Errors [1]Error `xml:"error"`
 }
 
 // SplitAddress takes a complete address and breaks it into pieces according
@@ -113,6 +114,7 @@ func handleErr(compliance ComplianceOptions, err error, r *http.Request, w http.
 			}
 			var errors Errors
 			errors.Errors[0] = err
+			errors.Xmlns = "urn:ietf:params:xml:ns:yang:ietf-restconf"
 			xml.NewEncoder(&buff).Encode(&errors)
 		} else {
 			errResp := errResponse{
